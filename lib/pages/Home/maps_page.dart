@@ -54,34 +54,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   late Position lastPos;
 
-  @override
-  void initState() {
-    super.initState();
-
-    // adding dummy movement at initial stage
-    // to demonstration smooth motion of marker
-    // Future.delayed(
-    //   const Duration(seconds: 1),
-    //   () {
-    //     stream.listen((event) async {
-    //       animateCar(kStartPosition, event, _mapMarkerSink, this, _controller);
-    //     }).onDone(
-    //       () async {
-    //         // after dummy motion move marker back to current location
-    //         Position position = await _determinePosition();
-    //         animateCar(
-    //             kStartPosition,
-    //             LatLng(position.latitude, position.longitude),
-    //             _mapMarkerSink,
-    //             this,
-    //             _controller);
-    //       },
-    //     );
-    //   },
-    // );
-
-    //Starting the animation after 1 second.
-    // handle realtime movement and update marker and camera
+  Future<void> startLocationStream() async {
     Future.delayed(const Duration(seconds: 1)).then((value) async {
       Position position = await _determinePosition();
       setState(() {
@@ -118,6 +91,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         });
       });
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // adding dummy movement at initial stage
+    // to demonstration smooth motion of marker
+    Future.delayed(
+      const Duration(seconds: 1),
+      () {
+        stream.listen((event) async {
+          await animateCar(
+              kStartPosition, event, _mapMarkerSink, this, _controller);
+        }).onDone(
+          () async {
+            // after dummy motion move marker back to current location
+            Future.delayed(const Duration(seconds: 1), () async {
+              Position position = await _determinePosition();
+              animateCar(
+                  kStartPosition,
+                  LatLng(position.latitude, position.longitude),
+                  _mapMarkerSink,
+                  this,
+                  _controller);
+              startLocationStream();
+            });
+          },
+        );
+      },
+    );
+
+    //Starting the animation after 1 second.
+    // handle realtime movement and update marker and camera
   }
 
   @override

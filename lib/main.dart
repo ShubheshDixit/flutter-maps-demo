@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:rexy_demo/pages/Home/index.dart';
 
 void main() {

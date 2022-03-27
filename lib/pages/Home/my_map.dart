@@ -38,31 +38,16 @@ class _MyMapPageState extends State<MyMapPage> {
   final LocationSettings locationSettings = const LocationSettings(
     accuracy: LocationAccuracy.high,
     // Change the accuracy for refined results
-    distanceFilter: 80,
+    distanceFilter: 10,
   );
 
   late StreamSubscription<Position> positionStream;
 
   late LatLng lastPos;
 
-  @override
-  void initState() {
-    super.initState();
-
-    // adding dummy movement at initial stage
-    // to demonstration smooth motion of marker
-    // Future.delayed(const Duration(seconds: 1), () {
-    //   stream.listen((event) async {
-    //     newLocationUpdate(event);
-    //   }).onDone(() async {
-    //     // after dummy motion move marker back to current location
-    //     Position position = await _determinePosition();
-    //     newLocationUpdate(LatLng(position.latitude, position.longitude));
-    //   });
-    // });
-
+  Future<void> startLocationStream() async {
     // handle realtime movement and update marker and camera
-    Future.delayed(const Duration(seconds: 1), () async {
+    await Future.delayed(const Duration(seconds: 1), () async {
       Position position = await _determinePosition();
       var pos = LatLng(position.latitude, position.longitude);
       setState(() {
@@ -83,6 +68,26 @@ class _MyMapPageState extends State<MyMapPage> {
               ? 'Unknown'
               : '${position.latitude.toString()}, ${position.longitude.toString()}',
         );
+      });
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    // adding dummy movement at initial stage
+    // to demonstration smooth motion of marker
+    Future.delayed(const Duration(seconds: 1), () {
+      stream.listen((event) async {
+        newLocationUpdate(event);
+      }).onDone(() async {
+        // after dummy motion move marker back to current location
+        Future.delayed(const Duration(seconds: 1), () async {
+          Position position = await _determinePosition();
+          newLocationUpdate(LatLng(position.latitude, position.longitude));
+        });
+        startLocationStream();
       });
     });
   }
@@ -109,7 +114,27 @@ class _MyMapPageState extends State<MyMapPage> {
       // Location services are not enabled don't continue
       // accessing the position and request users of the
       // App to enable the location services.
-      return Future.error('Location services are disabled.');
+      showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Please enable location service'),
+              actions: [
+                ElevatedButton(
+                  onPressed: () async {
+                    await Geolocator.openLocationSettings().then((value) {
+                      Navigator.of(context).pop();
+                      _determinePosition();
+                      // startLocationStream();
+                    });
+                  },
+                  child: const Text('Enable Location'),
+                )
+              ],
+            );
+          });
+      // return Future.error('Location services are disabled.');
+
     }
 
     permission = await Geolocator.checkPermission();
@@ -121,14 +146,49 @@ class _MyMapPageState extends State<MyMapPage> {
         // Android's shouldShowRequestPermissionRationale
         // returned true. According to Android guidelines
         // your App should show an explanatory UI now.
-        return Future.error('Location permissions are denied');
+        showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text('Please allow permission for location'),
+                actions: [
+                  ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      _determinePosition();
+                      startLocationStream();
+                    },
+                    child: const Text('Allow'),
+                  )
+                ],
+              );
+            });
+        // return Future.error('Location permissions are denied');
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
       // Permissions are denied forever, handle appropriately.
-      return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
+      showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Please allow permission for location'),
+              actions: [
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await Geolocator.openAppSettings();
+                    _determinePosition();
+                    startLocationStream();
+                  },
+                  child: const Text('Open Settings'),
+                )
+              ],
+            );
+          });
+      // return Future.error(
+      //     'Location permissions are permanently denied, we cannot request permissions.');
     }
 
     // When we reach here, permissions are granted and we can
@@ -145,7 +205,9 @@ class _MyMapPageState extends State<MyMapPage> {
       position: latLng,
       // ripple: true,
     );
-    setState(() => markers[kMarkerId] = marker);
+    if (mounted) {
+      setState(() => markers[kMarkerId] = marker);
+    }
 
     //Moving the google camera to the new animated location.
     Future.delayed(const Duration(seconds: 1), () {
@@ -179,7 +241,11 @@ class _MyMapPageState extends State<MyMapPage> {
       ),
       body: FutureBuilder<Position?>(
         future: Future.delayed(const Duration(seconds: 2), () async {
-          return await _determinePosition();
+          try {
+            return await _determinePosition();
+          } catch (err) {
+            return null;
+          }
         }),
         builder: (context, snap) {
           if (snap.data == null) {
